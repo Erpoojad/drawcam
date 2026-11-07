@@ -1,0 +1,68 @@
+{
+  "part_name": "SHAFT-01",
+  "material": "EN8",
+  "part_length": 100.0,
+  "max_dia": 40.0,
+  "stock_dia": 45,
+  "stock_length": 104.0,
+  "profile": [
+    [
+      0.0,
+      19.85
+    ],
+    [
+      -25.0,
+      19.85
+    ],
+    [
+      -25.0,
+      25.0
+    ],
+    [
+      -57.0,
+      25.0
+    ],
+    [
+      -57.0,
+      40.0
+    ],
+    [
+      -72.0,
+      40.0
+    ],
+    [
+      -72.0,
+      30.0
+    ],
+    [
+      -100.0,
+      30.0
+    ]
+  ],
+  "threads": [
+    {
+      "z_start": 0.0,
+      "z_end": -22.0,
+      "major_dia": 20.0,
+      "pitch": 1.5,
+      "external": true
+    }
+  ],
+  "grooves": [
+    {
+      "z": -25.0,
+      "width": 3.0,
+      "bottom_dia": 16.9
+    }
+  ],
+  "bore": null,
+  "chamfer": 1.0,
+  "review": [
+    {
+      "field": "setup",
+      "message": "profile gets smaller again past the largest diameter: part needs two setups (program 2 is generated, flip the part)",
+      "severity": "warn"
+    }
+  ],
+  "machine": "lathe"
+}

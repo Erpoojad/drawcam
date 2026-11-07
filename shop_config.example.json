@@ -1,0 +1,65 @@
+{
+  "lathe": {
+    "max_rpm": 3000,
+    "program_number": 1001,
+    "tools": {
+      "face_rough": {
+        "t": 1
+      },
+      "finish": {
+        "t": 3
+      },
+      "groove": {
+        "t": 5
+      },
+      "thread": {
+        "t": 7
+      },
+      "drill": {
+        "t": 9
+      },
+      "bore": {
+        "t": 10
+      },
+      "part": {
+        "t": 11
+      }
+    }
+  },
+  "mill": {
+    "max_rpm": 8000,
+    "travel": [
+      600,
+      400,
+      450
+    ],
+    "work_offset": "G54",
+    "endmills": {
+      "4": 4,
+      "6": 6,
+      "8": 8,
+      "10": 10,
+      "12": 12,
+      "16": 16,
+      "20": 20
+    }
+  },
+  "materials": {
+    "EN8": {
+      "vc_rough": 160,
+      "vc_finish": 200,
+      "f_rough": 0.22,
+      "f_finish": 0.1,
+      "doc": 1.8,
+      "vc_mill": 100,
+      "fz": 0.045,
+      "vc_face": 130,
+      "fz_face": 0.1,
+      "vc_drill": 20,
+      "f_drill": 0.1,
+      "vc_tap": 6,
+      "vc_thread": 90
+    }
+  },
+  "_comment": "Only put what differs from the defaults. Turret positions, max RPM, travel, and the speeds your operators trust."
+}

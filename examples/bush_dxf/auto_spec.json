@@ -1,0 +1,52 @@
+{
+ "drawing": "/home/claude/drawcam/samples/bush.dxf",
+ "source": "dxf",
+ "features": {
+  "has_h_center": 1.0,
+  "symmetry": 1.0,
+  "n_circles_main": 0.0,
+  "n_circles_total": 3.0,
+  "aspect": 0.6666666666666666,
+  "dia_text_ratio": 0.75,
+  "thread_text": 0.0,
+  "n_views": 2.0,
+  "concentric_small_view": 1.0,
+  "hole_count_text": 1.0
+ },
+ "auto": {
+  "part_name": "BUSH-07",
+  "material": "MS",
+  "part_length": 40.0,
+  "max_dia": 60.0,
+  "stock_dia": 65,
+  "stock_length": 44.0,
+  "profile": [
+   [
+    0.0,
+    34.985
+   ],
+   [
+    -30.0,
+    34.985
+   ],
+   [
+    -30.0,
+    60.0
+   ],
+   [
+    -40.0,
+    60.0
+   ]
+  ],
+  "threads": [],
+  "grooves": [],
+  "bore": {
+   "dia": 20.0105,
+   "depth": 40.0,
+   "through": true
+  },
+  "chamfer": 0.5,
+  "review": [],
+  "machine": "lathe"
+ }
+}

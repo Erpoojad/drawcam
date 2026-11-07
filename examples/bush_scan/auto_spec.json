@@ -1,0 +1,68 @@
+{
+ "drawing": "/home/claude/drawcam/samples/bush_scan.png",
+ "source": "scan",
+ "features": {
+  "has_h_center": 1.0,
+  "symmetry": 1.0,
+  "n_circles_main": 0.0,
+  "n_circles_total": 4.0,
+  "aspect": 0.6664315937940761,
+  "dia_text_ratio": 0.6666666666666666,
+  "thread_text": 0.0,
+  "n_views": 3.0,
+  "concentric_small_view": 1.0,
+  "hole_count_text": 1.0
+ },
+ "auto": {
+  "part_name": "BUSH-07",
+  "material": "MS",
+  "part_length": 40.0,
+  "max_dia": 60.0,
+  "stock_dia": 65,
+  "stock_length": 44.0,
+  "profile": [
+   [
+    0.0,
+    34.985
+   ],
+   [
+    -30.0,
+    34.985
+   ],
+   [
+    -30.0,
+    60.0
+   ],
+   [
+    -40.0,
+    60.0
+   ]
+  ],
+  "threads": [],
+  "grooves": [],
+  "bore": {
+   "dia": 20.0105,
+   "depth": 40.0,
+   "through": true
+  },
+  "chamfer": 0.5,
+  "review": [
+   {
+    "field": "scale",
+    "message": "overall length and largest diameter imply different scales; check the profile",
+    "severity": "warn"
+   },
+   {
+    "field": "profile",
+    "message": "diameter read as 59.82, set to 60: no matching dimension text",
+    "severity": "warn"
+   },
+   {
+    "field": "profile",
+    "message": "step positions read from a scan and rounded to 0.5 mm: check every Z against the drawing",
+    "severity": "warn"
+   }
+  ],
+  "machine": "lathe"
+ }
+}

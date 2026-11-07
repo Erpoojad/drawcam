@@ -1,0 +1,132 @@
+{
+  "part_name": "PLATE-12",
+  "material": "AL",
+  "stock_x": 124.0,
+  "stock_y": 84.0,
+  "stock_z": 22.0,
+  "part_z": 20.0,
+  "outline": [
+    [
+      120.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      80.0
+    ],
+    [
+      120.0,
+      80.0
+    ],
+    [
+      120.0,
+      0.0
+    ]
+  ],
+  "holes": [
+    {
+      "x": 90.0,
+      "y": 70.0,
+      "dia": 8.0,
+      "depth": 15.0,
+      "kind": "tap",
+      "pitch": 1.25,
+      "through": false
+    },
+    {
+      "x": 30.0,
+      "y": 70.0,
+      "dia": 8.0,
+      "depth": 15.0,
+      "kind": "tap",
+      "pitch": 1.25,
+      "through": false
+    },
+    {
+      "x": 10.0,
+      "y": 10.0,
+      "dia": 8.5,
+      "depth": 20.0,
+      "kind": "drill",
+      "pitch": 0.0,
+      "through": true
+    },
+    {
+      "x": 10.0,
+      "y": 70.0,
+      "dia": 8.5,
+      "depth": 20.0,
+      "kind": "drill",
+      "pitch": 0.0,
+      "through": true
+    },
+    {
+      "x": 110.0,
+      "y": 10.0,
+      "dia": 8.5,
+      "depth": 20.0,
+      "kind": "drill",
+      "pitch": 0.0,
+      "through": true
+    },
+    {
+      "x": 110.0,
+      "y": 70.0,
+      "dia": 8.5,
+      "depth": 20.0,
+      "kind": "drill",
+      "pitch": 0.0,
+      "through": true
+    },
+    {
+      "x": 100.0,
+      "y": 40.0,
+      "dia": 10.0,
+      "depth": 20.0,
+      "kind": "ream",
+      "pitch": 0.0,
+      "through": true
+    }
+  ],
+  "pockets": [
+    {
+      "shape": "circle",
+      "depth": 5.0,
+      "cx": 20.0,
+      "cy": 40.0,
+      "w": 0.0,
+      "h": 0.0,
+      "r": 15.0,
+      "corner_r": 0.0,
+      "points": []
+    },
+    {
+      "shape": "rect",
+      "depth": 8.0,
+      "cx": 62.0,
+      "cy": 40.0,
+      "w": 40.0,
+      "h": 30.0,
+      "r": 0.0,
+      "corner_r": 5.0,
+      "points": []
+    }
+  ],
+  "review": [
+    {
+      "field": "machine",
+      "message": "machine type 'mill' guessed with 73% confidence (ml); pass --machine to force",
+      "severity": "warn"
+    },
+    {
+      "field": "stock",
+      "message": "stock assumed 2 mm oversize per side and 2 mm on top; edit stock_* if blanks are pre-sized",
+      "severity": "warn"
+    }
+  ],
+  "machine": "mill"
+}

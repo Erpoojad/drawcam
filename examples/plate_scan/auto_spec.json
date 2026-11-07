@@ -1,0 +1,153 @@
+{
+ "drawing": "/home/claude/drawcam/samples/plate_scan.png",
+ "source": "scan",
+ "features": {
+  "has_h_center": 0.0,
+  "symmetry": 0.9771863117870723,
+  "n_circles_main": 7.0,
+  "n_circles_total": 7.0,
+  "aspect": 1.4994708994708992,
+  "dia_text_ratio": 0.5,
+  "thread_text": 1.0,
+  "n_views": 2.0,
+  "concentric_small_view": 0.0,
+  "hole_count_text": 3.0
+ },
+ "auto": {
+  "part_name": "PLATE-12",
+  "material": "AL",
+  "stock_x": 124.0,
+  "stock_y": 84.0,
+  "stock_z": 22.0,
+  "part_z": 20.0,
+  "outline": [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    120.0,
+    0.0
+   ],
+   [
+    120.0,
+    80.0
+   ],
+   [
+    0.0,
+    80.0
+   ],
+   [
+    0.0,
+    0.0
+   ]
+  ],
+  "holes": [
+   {
+    "x": 30.0,
+    "y": 70.0,
+    "dia": 8.0,
+    "depth": 15.0,
+    "kind": "tap",
+    "pitch": 1.25,
+    "through": false
+   },
+   {
+    "x": 90.0,
+    "y": 70.0,
+    "dia": 8.0,
+    "depth": 15.0,
+    "kind": "tap",
+    "pitch": 1.25,
+    "through": false
+   },
+   {
+    "x": 10.0,
+    "y": 10.0,
+    "dia": 8.5,
+    "depth": 20.0,
+    "kind": "drill",
+    "pitch": 0.0,
+    "through": true
+   },
+   {
+    "x": 10.0,
+    "y": 70.0,
+    "dia": 8.5,
+    "depth": 20.0,
+    "kind": "drill",
+    "pitch": 0.0,
+    "through": true
+   },
+   {
+    "x": 110.0,
+    "y": 10.0,
+    "dia": 8.5,
+    "depth": 20.0,
+    "kind": "drill",
+    "pitch": 0.0,
+    "through": true
+   },
+   {
+    "x": 110.0,
+    "y": 70.0,
+    "dia": 8.5,
+    "depth": 20.0,
+    "kind": "drill",
+    "pitch": 0.0,
+    "through": true
+   },
+   {
+    "x": 100.0,
+    "y": 40.0,
+    "dia": 10.0,
+    "depth": 20.0,
+    "kind": "ream",
+    "pitch": 0.0,
+    "through": true
+   }
+  ],
+  "pockets": [
+   {
+    "shape": "circle",
+    "depth": 5.0,
+    "cx": 20.0,
+    "cy": 40.0,
+    "w": 0.0,
+    "h": 0.0,
+    "r": 15.0,
+    "corner_r": 0.0,
+    "points": []
+   },
+   {
+    "shape": "rect",
+    "depth": 8.0,
+    "cx": 62.0,
+    "cy": 40.0,
+    "w": 40.0,
+    "h": 30.0,
+    "r": 0.0,
+    "corner_r": 5.0,
+    "points": []
+   }
+  ],
+  "review": [
+   {
+    "field": "machine",
+    "message": "machine type 'mill' guessed with 75% confidence (ml); pass --machine to force",
+    "severity": "warn"
+   },
+   {
+    "field": "stock",
+    "message": "stock assumed 2 mm oversize per side and 2 mm on top; edit stock_* if blanks are pre-sized",
+    "severity": "warn"
+   },
+   {
+    "field": "geometry",
+    "message": "positions read from a scan: verify every hole X/Y against the drawing",
+    "severity": "warn"
+   }
+  ],
+  "machine": "mill"
+ }
+}

@@ -1,0 +1,13 @@
+ezdxf>=1.3
+pymupdf>=1.24
+opencv-contrib-python>=4.8
+pytesseract>=0.3.10
+numpy
+shapely>=2.0
+scikit-learn
+joblib
+matplotlib
+reportlab        # only for samples/make_samples.py
+pytest
+# system: Tesseract OCR 5.x  (Windows: UB Mannheim installer; Ubuntu: apt install tesseract-ocr)
+# optional: ultralytics  (only for ml/symbol_detector.py)
