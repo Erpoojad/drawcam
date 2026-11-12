@@ -52,6 +52,37 @@ def _bridge_gaps(segs, ytol=0.4, gap=10.0):
     return out + rest
 
 
+def _snap_corners(segs, tol=1.2):
+    """Raster line finders stop short of T-junctions and corners. Move the ends of
+    horizontal lines onto the nearest vertical line within tol (model mm)."""
+    verts = [s for s in segs if s.is_vertical(0.02)]
+    for s in segs:
+        if not s.is_horizontal(0.01):
+            continue
+        y = (s.y1 + s.y2) / 2
+        for attr in ("x1", "x2"):
+            x = getattr(s, attr)
+            near = [v for v in verts if abs(v.x1 - x) <= tol and min(v.y1, v.y2) - tol <= y <= max(v.y1, v.y2) + tol]
+            if near:
+                setattr(s, attr, min(near, key=lambda v: abs(v.x1 - x)).x1)
+    return segs
+
+
+def _trim_ends(profile):
+    """Strip things that are not material: points on/near the axis at either end
+    (centre-line stubs, stray marks) and the face verticals themselves."""
+    changed = True
+    while changed and len(profile) > 2:
+        changed = False
+        if profile[0][1] < 1.0 or abs(profile[1][0] - profile[0][0]) < 0.3:
+            profile.pop(0)
+            changed = True
+        elif profile[-1][1] < 1.0 or abs(profile[-1][0] - profile[-2][0]) < 0.3:
+            profile.pop()
+            changed = True
+    return profile
+
+
 def _clean(points, tol=1e-3):
     out = []
     for p in points:
@@ -83,7 +114,7 @@ def recognize_turning(d: Drawing) -> TurnSpec:
 
     vis = [s for s in main.segs if s.kind == "visible" and max(s.y1, s.y2) > axis + 1e-3]
     if d.source == "scan":
-        vis = _bridge_gaps(vis)
+        vis = _snap_corners(_bridge_gaps(vis))
     xmax = b[2]
     xs = sorted({round(v, 4) for s in vis for v in (s.x1, s.x2)})
     eps = 1e-4
@@ -95,7 +126,7 @@ def recognize_turning(d: Drawing) -> TurnSpec:
             continue
         pts.append([round(xa - xmax, 4), round(2 * ra, 4)])
         pts.append([round(xb - xmax, 4), round(2 * rb, 4)])
-    profile = _clean(pts)
+    profile = _trim_ends(_clean(pts))
     if len(profile) < 2:
         raise ValueError("could not trace a turned profile from the side view")
 
@@ -128,19 +159,30 @@ def recognize_turning(d: Drawing) -> TurnSpec:
             p[0] = round(p[0] * 2) / 2
         review.append(ReviewItem("profile", "step positions read from a scan and rounded to 0.5 mm: check every Z against the drawing"))
     profile = _clean(profile)
+    profile = _trim_ends(profile)
 
+    # Z0 is the finished right face by definition (a stray pixel past the face
+    # on a photo must not shift the whole part)
+    z0 = profile[0][0]
+    if abs(z0) > 1e-9:
+        for p in profile:
+            p[0] = round(p[0] - z0, 4)
     part_length = round(-profile[-1][0], 3)
     lens = [c.length for c in cs if c.length]
     if lens:
-        L = max(lens)
-        if abs(L - part_length) > max(0.05, 0.01 * L):
-            review.append(ReviewItem("length", f"traced length {part_length} vs largest dimension {L}; using {L}" if is_scan else
-                                     f"traced length {part_length} differs from dimension {L}", "warn"))
-            if is_scan:
-                k = L / part_length
-                for p in profile:
-                    p[0] = round(p[0] * k, 2)
-                part_length = L
+        # the stated length that matches the traced one; a far-off "largest number"
+        # is usually a mis-read diameter, not the overall length
+        L = min(lens, key=lambda v: abs(v - part_length))
+        if abs(L - part_length) <= 0.05:
+            pass
+        elif is_scan and abs(L - part_length) <= 0.04 * L:
+            k = L / part_length
+            for p in profile:
+                p[0] = round(p[0] * k * 2) / 2 if abs(p[0] * k * 2 - round(p[0] * k * 2)) < 0.3 else round(p[0] * k, 2)
+            part_length = L
+            review.append(ReviewItem("length", f"traced length stretched to the stated {L:g}; check step positions"))
+        else:
+            review.append(ReviewItem("length", f"traced length {part_length:g} matches no stated dimension; check it"))
 
     # --- threads ---
     threads = []
@@ -178,6 +220,16 @@ def recognize_turning(d: Drawing) -> TurnSpec:
         else:
             i += 1
     profile = _clean(profile)
+    called = [c for c in cs if ("GROOVE" in c.keywords or "U/C" in c.keywords or "UNDERCUT" in c.keywords)]
+    if len(called) > len(grooves):
+        review.append(ReviewItem("groove", f"the drawing calls out {len(called)} groove(s) but {len(grooves)} were found in the "
+                                           "outline; add it to 'grooves' in the spec", "block"))
+    if is_scan:
+        for (za, da), (zb, db) in zip(profile, profile[1:]):
+            # chamfers come from spec.chamfer, so any slope read from an image needs a human
+            if abs(za - zb) > 1e-6 and abs(da - db) > 1e-6:
+                review.append(ReviewItem("profile", f"taper read from the image between Z{za:g} and Z{zb:g} "
+                                                    f"(Ø{da:g} to Ø{db:g}): confirm it is on the drawing", "block"))
 
     # --- bore ---
     bore = None

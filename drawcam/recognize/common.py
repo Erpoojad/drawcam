@@ -131,72 +131,156 @@ def globals_(d: Drawing):
 
 
 # ---------------------------------------------------------- calibration ----
+NO_GEOMETRY = ("no part outline could be found in this drawing. For photos: lay the sheet flat, "
+               "fill the frame, avoid shadows and glare, hold the phone straight above it. "
+               "For scans: 300 dpi, black and white. A DXF or CAD-exported PDF always works best.")
+
+
 def side_view(views):
     """Lathe side view: has a long horizontal centre line and horizontal outline lines."""
+    if not views:
+        raise ValueError(NO_GEOMETRY)
     def has_axis(v):
         return any(s.kind == "center" and s.is_horizontal(0.01) and s.length > 0.6 * v.width for s in v.segs)
-    cands = [v for v in views if has_axis(v)] or views
-    return max(cands, key=lambda v: (sum(1 for s in v.segs if s.kind == "visible" and s.is_horizontal(0.01)), v.width))
+    def hlen(v):          # total length of long horizontal outline lines
+        return sum(s.length for s in v.segs if s.kind == "visible" and s.is_horizontal(0.01) and s.length > 0.08 * max(v.width, 1e-6))
+
+    def roundish(v):      # an end view: concentric circles fill its box
+        return len(v.circles) >= 1 and max(c.r for c in v.circles) * 2 > 0.8 * max(v.width, v.height)
+
+    cands = [v for v in views if has_axis(v) and not roundish(v)] or [v for v in views if not roundish(v)] or views
+    return max(cands, key=lambda v: (hlen(v), v.width))
 
 
 def top_view(views):
+    if not views:
+        raise ValueError(NO_GEOMETRY)
     return max(views, key=lambda v: (len(v.circles), v.width * v.height))
 
 
+def _measured_sizes(main, others, machine):
+    """Sizes that dimensions on the sheet usually refer to, in paper units."""
+    m = [main.width, main.height]
+    vis = [s for s in main.segs if s.kind == "visible"]
+    if machine == "lathe":
+        cen = [s for s in main.segs if s.kind == "center" and s.is_horizontal(0.01)]
+        b = main.bbox()
+        axis = max(cen, key=lambda s: s.length).y1 if cen else (b[1] + b[3]) / 2
+        m += [2 * abs((s.y1 + s.y2) / 2 - axis) for s in vis if s.is_horizontal(0.01) and s.length > 0.02 * main.width]
+        xs = sorted({round((s.x1 + s.x2) / 2, 2) for s in vis if s.is_vertical(0.01)})
+        m += [xb - xa for i, xa in enumerate(xs) for xb in xs[i + 1:]]
+    else:
+        m += [2 * c.r for c in main.circles]
+        m += [v.height for v in others] + [v.width for v in others]
+    return [x for x in m if x > 0.5]
+
+
 def calibrate(d: Drawing, review: list, machine: str) -> None:
-    """Convert paper/pixel mm to model mm.
-    DXF is already in model units. PDF/scan: estimate the factor from the
-    largest dimensions, cross-check against the title-block SCALE."""
+    """Convert paper/pixel mm to model mm (DXF is already in model units).
+
+    Voting: every stated dimension divided by every measured size gives a
+    candidate scale; the scale that explains the most stated dimensions wins.
+    One mis-read number (OCR dropping a Ø, say) can no longer throw the part
+    off, which a 'largest dimension = overall length' rule could."""
     if d.source == "dxf":
         return
     g = globals_(d)
     views = split_views(d)
     if not views:
-        review.append(ReviewItem("geometry", "no outline geometry found", "block"))
-        return
+        raise ValueError(NO_GEOMETRY)
     cs = callouts(d)
-    lengths = sorted([c.length for c in cs if c.length], reverse=True)
-    dias = sorted([c.dia for c in cs if c.dia and not c.thread] + [c.thread[0] for c in cs if c.thread], reverse=True)
-
-    ests = []
-    if machine == "lathe":
-        main = side_view(views)
-        if dias and main.height:
-            ests.append(dias[0] / main.height)
-        if lengths and main.width:
-            ests.append(lengths[0] / main.width)
-    else:
-        main = top_view(views)
-        if lengths:
-            big = max(main.width, main.height)
-            ests.append(lengths[0] / big)
+    stated = sorted({round(c.length, 3) for c in cs if c.length and c.length > 0.5}
+                    | {round(c.dia, 3) for c in cs if c.dia and not c.thread}
+                    | {round(c.thread[0], 3) for c in cs if c.thread}, reverse=True)
+    main = side_view(views) if machine == "lathe" else top_view(views)
+    meas = _measured_sizes(main, [v for v in views if v is not main], machine)
+    tol = 0.03 if d.source == "scan" else 0.012
     scale = g["scale"]
-    est = None
-    if ests:
-        est = ests[0]
-        if len(ests) > 1 and abs(ests[0] - ests[1]) / ests[0] > 0.02:
-            # disagreement usually means a dimension was mis-read or missed; trust the
-            # estimate that agrees with the title block, else the overall length
-            pick = None
-            if scale:
-                pick = next((e for e in ests if abs(e - 1 / scale) * scale < 0.02), None)
-            est = pick or ests[-1]
-            review.append(ReviewItem("scale", "overall length and largest diameter imply different scales; check the profile", "warn"))
+    title = 1.0 / scale if scale else None
 
-    if scale:
-        model_per_paper = 1.0 / scale
-        if est and abs(est - model_per_paper) / model_per_paper > 0.02:
-            review.append(ReviewItem("scale", f"title block SCALE disagrees with dimensions (fits {1/est:.3f}:1); using dimensions", "warn"))
-            model_per_paper = est
-    elif est:
-        model_per_paper = est
-        if d.source == "pdf":
-            review.append(ReviewItem("scale", f"no SCALE in title block; calibrated from dimensions (x{est:.4f})", "warn"))
-    else:
-        model_per_paper = 1.0
-        review.append(ReviewItem("scale", "could not determine drawing scale; sizes may be wrong", "block"))
-    d.transform(model_per_paper)
+    def score(c):
+        hit = [v for v in stated if any(abs(v - c * m_) <= tol * v + 0.05 for m_ in meas)]
+        return len(hit), sum(hit)
+
+    cands = {v / m_ for v in stated for m_ in meas}
+    if title:
+        cands.add(title)
+    best, best_s = None, (0, 0.0)
+    for c in cands:
+        sc = score(c)
+        near_title = title is not None and abs(c - title) <= tol * title
+        key_ = (sc[0], near_title, sc[1])
+        if best is None or key_ > (best_s[0], best_near, best_s[1]):
+            best, best_s, best_near = c, sc, near_title
+    # The title-block SCALE wins when it explains most of what the best candidate does:
+    # pairwise spans in a noisy scan can produce chance matches for a wrong scale.
+    if title and best is not None and abs(best - title) > tol * title:
+        ts = score(title)
+        if ts[0] >= max(2, 0.6 * best_s[0]):
+            best, best_s, best_near = title, ts, True
+    if best is not None and best_s[0] >= 1:
+        # refine: least-squares over the dimensions that agreed
+        pairs = []
+        for v in stated:
+            m_ = min(meas, key=lambda m_: abs(v - best * m_))
+            if abs(v - best * m_) <= tol * v + 0.05:
+                pairs.append((v, m_))
+        if pairs:
+            best = sum(v * m_ for v, m_ in pairs) / sum(m_ * m_ for _, m_ in pairs)
+        if title and abs(best - title) <= tol * title:
+            best = title                                 # exact title-block scale when it agrees
+    n_ok = best_s[0]
+
+    if best is None or n_ok == 0:
+        if title:
+            best = title
+            review.append(ReviewItem("scale", "no dimension could be matched to the geometry; using the title-block SCALE", "warn"))
+        else:
+            d.transform(1.0)
+            review.append(ReviewItem("scale", "could not determine drawing scale; sizes may be wrong", "block"))
+            return
+    elif n_ok < 2 and not (title and abs(best - title) <= tol * title):
+        review.append(ReviewItem("scale", f"scale rests on a single dimension (x{best:.4f}); check sizes against the drawing", "warn"))
+    if title and abs(best - title) > tol * title:
+        review.append(ReviewItem("scale", f"title block SCALE disagrees with the dimensions (they fit {1/best:.3f}:1); using the dimensions", "warn"))
+    elif not title and d.source == "pdf":
+        review.append(ReviewItem("scale", f"no SCALE in title block; calibrated from {n_ok} dimensions", "warn"))
+    unexplained = [v for v in stated if not any(abs(v - best * m_) <= tol * v + 0.05 for m_ in meas)]
+    if unexplained and d.source == "scan":
+        review.append(ReviewItem("dimensions", "dimensions not found in the geometry (possible OCR misread): " + ", ".join(f"{v:g}" for v in unexplained[:6])))
+    d.transform(best)
     d.scale_known = True
+    if d.source == "scan":
+        _fix_aspect(d, machine, stated, review)
+
+
+def _fix_aspect(d, machine, stated, review):
+    """After a uniform scale, correct X and Y separately if the overall sizes say so
+    (photos: ~0.5-1 % difference between axes is common). Only small corrections."""
+    views = split_views(d)
+    main = side_view(views) if machine == "lathe" else top_view(views)
+    b = main.bbox()
+
+    def factor(measured):
+        if measured <= 1:
+            return 1.0
+        v = min(stated, key=lambda v: abs(v - measured), default=None)
+        if v is None or abs(v - measured) > 0.025 * v:
+            return 1.0
+        return v / measured
+    fx = factor(main.width)
+    if machine == "lathe":
+        cen = [s for s in main.segs if s.kind == "center" and s.is_horizontal(0.01)]
+        axis = max(cen, key=lambda s: s.length).y1 if cen else (b[1] + b[3]) / 2
+        fy = factor(2 * max(abs(b[3] - axis), abs(axis - b[1])))
+        oy = axis
+    else:
+        fy = factor(main.height)
+        oy = b[1]
+    if abs(fx - 1) > 0.002 or abs(fy - 1) > 0.002:
+        d.stretch(fx, fy, b[0], oy)
+        if abs(fx - fy) > 0.004:
+            review.append(ReviewItem("scale", f"image was stretched unevenly; corrected X by {100 * (fx - 1):+.1f} % and Y by {100 * (fy - 1):+.1f} %"))
 
 
 # ------------------------------------------------------ machine features ----

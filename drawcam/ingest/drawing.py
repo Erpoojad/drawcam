@@ -80,5 +80,19 @@ class Drawing:
         for t in self.texts:
             t.x, t.y, t.h = t.x * sx + dx, t.y * sx + dy, t.h * sx
 
+    def stretch(self, fx: float, fy: float, ox: float = 0.0, oy: float = 0.0):
+        """Separate X/Y correction about (ox, oy): photos and some scanners stretch one
+        axis slightly more than the other."""
+        X = lambda x: ox + (x - ox) * fx
+        Y = lambda y: oy + (y - oy) * fy
+        for s in self.segs:
+            s.x1, s.y1, s.x2, s.y2 = X(s.x1), Y(s.y1), X(s.x2), Y(s.y2)
+        r = (fx * fy) ** 0.5
+        for c in self.circles:
+            c.cx, c.cy, c.r = X(c.cx), Y(c.cy), c.r * r
+        self.polys = [[[X(x), Y(y)] for x, y in p] for p in self.polys]
+        for t in self.texts:
+            t.x, t.y = X(t.x), Y(t.y)
+
     def all_text(self) -> str:
         return "\n".join(t.text for t in self.texts)

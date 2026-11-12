@@ -52,3 +52,26 @@ def test_block_refuses_and_bad_input(client):
     assert "error=" in client.post("/read", data={}).location
     assert client.get("/job/../../etc/passwd").status_code == 404
     assert client.get(job + "/file/..%2Fspec.json").status_code == 404
+
+
+@pytest.mark.parametrize("fname,mime", [("bush_photo.jpg", "image/jpeg"), ("bush_photo_sideways.jpeg", "image/jpeg"),
+                                         ("bush_scanned.pdf", "application/pdf"), ("bush_screenshot.png", "image/png")])
+def test_upload_photo_png_jpeg_pdf(client, fname, mime):
+    import sys
+    sys.path.insert(0, S)
+    import make_samples
+    p = os.path.join(S, "raster", fname)
+    if not os.path.exists(p):
+        make_samples.make_raster_set(S)
+    with open(p, "rb") as f:
+        r = client.post("/read", data={"drawing": (f, fname.upper(), mime)}, content_type="multipart/form-data")
+    assert "/job/" in r.location, r.location
+    assert "BUSH-07" in client.get(r.location).get_data(as_text=True)
+
+
+def test_heic_and_garbage_rejected_nicely(client):
+    import io
+    r = client.post("/read", data={"drawing": (io.BytesIO(b"x" * 100), "IMG_1234.HEIC")}, content_type="multipart/form-data")
+    assert "HEIC" in r.location
+    r = client.post("/read", data={"drawing": (io.BytesIO(b"not an image"), "photo.jpg")}, content_type="multipart/form-data")
+    assert "error=" in r.location and "Traceback" not in r.location

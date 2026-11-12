@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SAMPLES = os.path.join(ROOT, "samples")
 JOBS = os.environ.get("DRAWCAM_JOBS", "/tmp/drawcam-jobs")
 SHOP = os.environ.get("DRAWCAM_SHOP")              # optional path to a shop config JSON
-ALLOWED = {".dxf", ".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
+ALLOWED = {".dxf", ".pdf", ".png", ".jpg", ".jpeg", ".jfif", ".tif", ".tiff", ".bmp", ".webp", ".gif"}
 KEEP_HOURS = 24
 SAMPLE_FILES = {
     "shaft": ("shaft.dxf", "Stepped shaft, M20 thread, 2 setups (lathe)"),
@@ -118,8 +118,10 @@ def read():
         ext = os.path.splitext(f.filename)[1].lower()
         if ext == ".dwg":
             return redirect(url_for("index", error="DWG can't be read directly: save it as DXF in your CAD software (or use the free ODA File Converter)."))
+        if ext in (".heic", ".heif"):
+            return redirect(url_for("index", error="iPhone HEIC photos aren't supported yet: share or export the photo as JPG and upload that."))
         if ext not in ALLOWED:
-            return redirect(url_for("index", error=f"Unsupported file type {ext}. Use DXF, PDF, PNG or JPG."))
+            return redirect(url_for("index", error=f"Unsupported file type '{ext or 'none'}'. Use DXF, PDF, PNG or JPG."))
         fname = "drawing" + ext
         src = os.path.join(d, fname)
         f.save(src)
@@ -133,10 +135,15 @@ def read():
     t0 = time.time()
     try:
         spec = cmd_read(_ns(drawing=src, out=d, machine=machine, dpi=max(150, min(dpi, 600))))
-    except Exception as ex:
+    except ValueError as ex:                          # expected: bad/unsupported drawing, message is for the user
+        shutil.rmtree(d, ignore_errors=True)
+        app.logger.warning("read rejected: %s", ex)
+        return redirect(url_for("index", error=f"Could not read this drawing: {ex}"))
+    except Exception:
         shutil.rmtree(d, ignore_errors=True)
         app.logger.error("read failed: %s", traceback.format_exc())
-        return redirect(url_for("index", error=f"Could not read this drawing: {ex}"))
+        return redirect(url_for("index", error="Something went wrong reading this drawing. Try a DXF or a CAD-exported PDF, "
+                                                "or a clearer scan/photo. The error has been logged."))
     json.dump({"original": (sample and SAMPLE_FILES[sample][0]) or request.files["drawing"].filename,
                "seconds": round(time.time() - t0, 1), "machine": spec.machine},
               open(os.path.join(d, "meta.json"), "w"))

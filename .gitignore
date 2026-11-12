@@ -4,3 +4,4 @@ __pycache__/
 out/
 jobs/
 samples/*_scan.png
+samples/raster/

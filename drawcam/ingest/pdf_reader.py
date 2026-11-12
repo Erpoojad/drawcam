@@ -34,10 +34,19 @@ def _dash_kind(dashes: str) -> str:
     return "visible"
 
 
-def is_vector(path: str) -> bool:
-    doc = pymupdf.open(path)
-    page = doc[0]
-    return len(page.get_drawings()) > 10 or len(page.get_text("words")) > 5
+def is_vector(path: str, page_no: int = 0) -> bool:
+    """True for PDFs exported from CAD (real lines). False for scans saved as PDF,
+    including "scan to PDF" files that carry an invisible OCR text layer."""
+    page = pymupdf.open(path)[page_no]
+    n_paths = len(page.get_drawings())
+    area = page.rect.width * page.rect.height
+    img_cover = 0.0
+    for info in page.get_image_info():
+        x0, y0, x1, y1 = info["bbox"]
+        img_cover = max(img_cover, max(x1 - x0, 0) * max(y1 - y0, 0) / area)
+    if img_cover > 0.5 and n_paths < 40:
+        return False                       # a page-sized picture with almost no line work
+    return n_paths > 10
 
 
 def read_pdf(path: str, page_no: int = 0) -> Drawing:

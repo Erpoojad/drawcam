@@ -1,3 +1,4 @@
+Pillow
 Flask>=3.0
 gunicorn
 ezdxf>=1.3

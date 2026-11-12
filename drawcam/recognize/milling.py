@@ -130,7 +130,9 @@ def recognize_milling(d: Drawing) -> MillSpec:
     hole_calls = [c for c in cs if c.dia or c.thread]
     holes, pockets = [], []
     def snap_xy(v):
-        if is_scan and abs(v * 2 - round(v * 2)) < 0.2:      # drawings use round coordinates
+        # drawings dimension hole positions to round numbers; photos leave ~0.3 mm of
+        # residual perspective, so positions within 0.4 mm of a 0.5 mm grid are snapped
+        if is_scan and abs(v * 2 - round(v * 2)) < 0.8:
             return round(v * 2) / 2
         return v
 
@@ -153,7 +155,12 @@ def recognize_milling(d: Drawing) -> MillSpec:
             review.append(ReviewItem("hole", f"ignored a Ø{dia:.1f} circle at X{x:.1f} Y{y:.1f} with no callout (likely a symbol)"))
             continue
         if call is None:
-            review.append(ReviewItem("hole", f"hole Ø{dia:.2f} at X{x:.2f} Y{y:.2f} has no callout; assumed drilled THRU"))
+            if dia > MAX_DRILL:
+                # a big circle with no readable callout may be a shallow pocket: never assume THRU silently
+                review.append(ReviewItem("hole", f"Ø{dia:.1f} circle at X{x:.1f} Y{y:.1f} has no readable callout: "
+                                                 "set its depth (pocket or through) in the spec", "block"))
+            else:
+                review.append(ReviewItem("hole", f"hole Ø{dia:.2f} at X{x:.2f} Y{y:.2f} has no callout; assumed drilled THRU"))
         if call and call.thread:
             major, pitch = call.thread
             depth = call.depth or thick
@@ -165,6 +172,9 @@ def recognize_milling(d: Drawing) -> MillSpec:
             dia = call.dia if reamed else call.mid_tol_value(call.dia)
         if len(full) >= 2:
             review.append(ReviewItem("hole", f"concentric circles at X{x:.1f} Y{y:.1f}: counterbore/spotface; only the through hole is programmed"))
+        if call is not None and dia > MAX_DRILL and not call.depth and not call.through:
+            review.append(ReviewItem("hole", f"Ø{dia:g} at X{x:g} Y{y:g}: callout '{call.raw}' gives no depth and no THRU; "
+                                             "set the depth in the spec (pocket) or mark it through", "block"))
         through = (call is None) or call.through or not call.depth
         depth = thick if through else call.depth
         if dia > MAX_DRILL:
@@ -189,6 +199,7 @@ def recognize_milling(d: Drawing) -> MillSpec:
             if is_scan:
                 cx, cy, w, h = snap_v(cx - ox) + ox, snap_v(cy - oy) + oy, snap_v(w), snap_v(h)
                 r = snap_v(r, 0.4)
+                review.append(ReviewItem("pocket", f"pocket {w:g}x{h:g} corner R{r:g} measured from the image: check against the drawing"))
             if r < 0.5:
                 review.append(ReviewItem("pocket", f"pocket {w:.1f}x{h:.1f} has sharp internal corners: not millable, will leave tool radius"))
             pockets.append(Pocket("rect", depth=depth, cx=round(cx - ox, 3), cy=round(cy - oy, 3), w=round(w, 3), h=round(h, 3), corner_r=r))

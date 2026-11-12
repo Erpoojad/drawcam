@@ -61,6 +61,9 @@ def normalize(raw: str, ocr: bool = False) -> str:
         s = re.sub(r"(^|\s)[@©gQoO](?=\d)", r"\1Ø", s)
         s = re.sub(r"(^|\s)0(?=\d{1,3}(?:\.\d+)?(?:\s|$|[hHgGfF]))", r"\1Ø", s)
         s = s.replace("+-", "±").replace("+/-", "±")
+        # Tesseract often reads the Ø glyph as a 9 or 0: "916.9" -> "Ø16.9"
+        # (a 3-digit dimension with a decimal on a small machined part is far less likely)
+        s = re.sub(r"(^|\s)[90](\d{1,2}\.\d+)\b", r"\1Ø\2", s)
         s = re.sub(r"\bC[lI|](?=\b)", "C1", s)                 # C1 chamfer read as Cl
         s = re.sub(r"(?<=\d)[lI|](?=\d|\b)", "1", s)
     return s.upper().replace("Ø", "Ø")

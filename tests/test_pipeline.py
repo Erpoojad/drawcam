@@ -137,3 +137,58 @@ def test_blocked_spec_refuses(tmp_path, specs):
     assert main(["gcode", str(p), "-o", str(tmp_path), "--no-log"]) == 1
     assert not list(tmp_path.glob("*.nc"))
     s.review.pop()
+
+
+# ------------------------------------------- photos, screenshots, scanned PDFs
+@pytest.fixture(scope="module")
+def raster_dir():
+    import sys
+    sys.path.insert(0, S)
+    import make_samples
+    d = os.path.join(S, "raster")
+    if not os.path.exists(os.path.join(d, "plate_photo.jpg")):
+        make_samples.make_raster_set(S)
+    return d
+
+
+@pytest.mark.parametrize("fname,expect", [
+    ("bush_photo.jpg", BUSH),
+    ("bush_photo_sideways.jpeg", BUSH),          # EXIF-rotated phone photo
+    ("shaft_photo.jpg", SHAFT),
+    ("shaft_scanned.pdf", SHAFT),                # image PDF with an invisible OCR text layer
+])
+def test_raster_inputs_read_exactly(raster_dir, fname, expect):
+    s = recognize(load_drawing(os.path.join(raster_dir, fname)))
+    assert s.machine == "lathe" and s.profile == expect
+
+
+@pytest.mark.parametrize("fname", ["plate_photo.jpg", "plate_scanned.pdf", "shaft_screenshot.png"])
+def test_unreadable_detail_blocks_gcode(raster_dir, fname):
+    """Where OCR loses a depth or a groove, the spec must be blocked, never guessed."""
+    s = recognize(load_drawing(os.path.join(raster_dir, fname)))
+    assert blocking(s)
+
+
+def test_photo_hole_positions(raster_dir):
+    s = recognize(load_drawing(os.path.join(raster_dir, "plate_photo.jpg")))
+    assert sorted((h.x, h.y) for h in s.holes) == sorted([(10, 10), (110, 10), (10, 70), (110, 70), (100, 40), (30, 70), (90, 70)])
+
+
+def test_scanned_pdf_detected_as_raster(raster_dir):
+    from drawcam.ingest.pdf_reader import is_vector
+    assert not is_vector(os.path.join(raster_dir, "plate_scanned.pdf"))
+    assert is_vector(os.path.join(S, "plate.pdf"))
+
+
+def test_bad_images_give_clear_errors(tmp_path):
+    import numpy as np
+    from PIL import Image
+    dark = tmp_path / "dark.jpg"
+    Image.fromarray(np.full((800, 1100), 20, np.uint8)).save(dark)
+    tiny = tmp_path / "tiny.png"
+    Image.fromarray(np.full((100, 140), 255, np.uint8)).save(tiny)
+    blank = tmp_path / "blank.png"
+    Image.fromarray(np.full((1200, 1700), 255, np.uint8)).save(blank)
+    for p in (dark, tiny, blank):
+        with pytest.raises(ValueError):
+            recognize(load_drawing(str(p)))

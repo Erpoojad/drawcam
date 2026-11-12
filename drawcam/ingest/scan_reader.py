@@ -17,15 +17,32 @@ from .drawing import Drawing, Seg, Circle, Text
 
 
 def _load(path_or_img, dpi):
+    """Any raster input -> clean upright grey image at ~300 dpi (see image_prep)."""
+    from .image_prep import load_image, prepare
     if isinstance(path_or_img, np.ndarray):
-        img = path_or_img
+        img, file_dpi = path_or_img, dpi
+        if img.ndim == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     else:
-        img = cv2.imread(path_or_img, cv2.IMREAD_GRAYSCALE)
-        if img is None:
-            raise ValueError(f"cannot read image {path_or_img}")
-    if img.ndim == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return img
+        try:
+            img, file_dpi = load_image(path_or_img)
+        except Exception as ex:
+            raise ValueError(f"cannot open this image ({ex}). Save it as PNG or JPG and try again.") from None
+    if min(img.shape) < 300:
+        raise ValueError(f"image is only {img.shape[1]}x{img.shape[0]} pixels: far too small to read. "
+                         "Scan at 300 dpi or photograph the whole sheet in good light.")
+    return prepare(img, file_dpi)
+
+
+def _stroke_widths(bw):
+    dist = cv2.distanceTransform(bw, cv2.DIST_L2, 3)
+    skel = cv2.ximgproc.thinning(bw)
+    w = 2 * dist[skel > 0]
+    return w[w > 0.5]
+
+
+KEYWORDS = {"DP", "DEPTH", "DEEP", "THRU", "THROUGH", "POCKET", "DRILL", "TAP", "REAM", "GROOVE", "WIDE", "SLOT",
+            "CBORE", "SPOTFACE", "THK", "THICK", "MATERIAL", "SCALE", "QTY", "PART", "NAME", "NO", "H7", "PCD", "TYP"}
 
 
 def _ocr(gray):
@@ -41,8 +58,9 @@ def _ocr(gray):
         if h < 6 or (len(t) == 1 and not t.isalnum()):
             continue
         # small circles and arcs get "read" as O, o, 0, @, oe, so... - leave them as geometry
-        if not any(ch.isdigit() for ch in t) and (conf < 70 or set(t) <= set("oO0Q@©°easo")):
-            continue
+        if not any(ch.isdigit() for ch in t):
+            if set(t) <= set("oO0Q@©°easo()") or (conf < 50 and t.upper().strip(".:") not in KEYWORDS):
+                continue
         words.append([t, x, y, x + w, y + h, conf / 100])
     # Merge words that sit on the same baseline and are close together.
     words.sort(key=lambda w: (round(w[2] / 10), w[1]))
@@ -108,12 +126,17 @@ def _merge_segments(segs, ang_tol=2.0, dist_tol=3.0, gap=6.0):
 
 
 def read_scan(path_or_img, dpi: int = 300) -> Drawing:
-    gray = _load(path_or_img, dpi)
+    gray, dpi, prep_notes = _load(path_or_img, dpi)
     H, W = gray.shape
     px2mm = 25.4 / dpi
     d = Drawing(source="scan", scale_known=False)
+    d.notes += prep_notes
 
     _, bw = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    if cv2.countNonZero(bw) > 0.35 * H * W:
+        raise ValueError("the image is mostly dark: this does not look like a drawing on paper. "
+                         "Photograph the sheet flat, in even light, filling most of the picture.")
+    bw = cv2.morphologyEx(bw, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))   # speckle from JPEG/paper grain
 
     # 1) OCR text, then erase it so letters do not become "lines".
     #    Circles are found on the un-erased image (a hole next to its callout
@@ -139,18 +162,37 @@ def read_scan(path_or_img, dpi: int = 300) -> Drawing:
 
     # 3) Thick vs thin strokes. Opening with a kernel wider than a thin line
     #    keeps only outline (ISO 0.5-0.7 mm) strokes.
+    #    The split width is checked against the strokes actually present: photos,
+    #    hand drawings and some CAD plots use one line weight for everything.
     k = max(2, int(round(0.38 / px2mm)))
-    thick = cv2.morphologyEx(bw, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
-    thick = cv2.dilate(thick, np.ones((3, 3), np.uint8))
-    thin = cv2.subtract(bw, thick)
+    sw = _stroke_widths(bw)
+    uniform = False
+    if len(sw) > 500:
+        thin_w, thick_w = float(np.percentile(sw, 10)), float(np.percentile(sw, 90))
+        if thick_w < 1.7 * thin_w:
+            uniform = True
+        elif not (thin_w < k < thick_w):
+            k = max(2, int(round(math.sqrt(thin_w * thick_w))))
+    if uniform:
+        thick = bw.copy()
+        thin = np.zeros_like(bw)
+        d.notes.append("all lines have the same thickness: outline and dimension lines can't be told apart, check the profile carefully")
+    else:
+        thick = cv2.morphologyEx(bw, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+        thick = cv2.dilate(thick, np.ones((3, 3), np.uint8))
+        thin = cv2.subtract(bw, thick)
 
     # 4) Circles on the thick layer: every closed stroke gives an outer and an
     #    inner contour; fit a circle to each (least squares) and average the pair.
     found = []
-    thick_full = cv2.morphologyEx(bw_full, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
-    thick_masked = cv2.morphologyEx(bw, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    kk = 1 if uniform else k
+    thick_full = cv2.morphologyEx(bw_full, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kk, kk)))
+    thick_masked = cv2.morphologyEx(bw, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kk, kk)))
     passes = []
-    for img_, need_ in ((thick_full, 0.95), (thick_masked, 0.75)):     # text-free pass may clip a rim
+    # Circles are looked for on the outline layer AND on all strokes: blur in photos can
+    # thin an outline circle below the split width. A fit must still be round and
+    # closed, so dimension lines, arrows and partial thread arcs don't qualify.
+    for img_, need_ in ((thick_full, 0.95), (thick_masked, 0.75), (bw_full, 0.97)):
         cs_, _ = cv2.findContours(img_, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         passes += [(c, need_) for c in cs_]
     for c, need in passes:
@@ -258,7 +300,7 @@ def read_scan(path_or_img, dpi: int = 300) -> Drawing:
     if tbox:
         d.polys = [p_ for p_ in d.polys if not all(tbox[0] <= x <= tbox[2] and tbox[1] <= y <= tbox[3] for x, y in p_)]
 
-    d.notes.append(f"scan read at {dpi} dpi: geometry is approximate, snapped to OCR dimensions where possible")
+    d.notes.append(f"image read at ~{dpi:.0f} dpi: geometry is approximate, snapped to OCR dimensions where possible")
     return d
 
 

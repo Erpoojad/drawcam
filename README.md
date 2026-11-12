@@ -119,6 +119,28 @@ SCALE, THK, PART NO, QTY; centre/hidden linetypes or layer names; 3/4-arc thread
 
 ---
 
+## Input formats
+
+| Input | How it's read | Reliability |
+|---|---|---|
+| DXF | exact geometry | best |
+| PDF exported from CAD | vector lines and text | very good |
+| PDF from a scanner (incl. ones with a hidden OCR text layer) | rendered, then read as an image | fair |
+| PNG / JPG / JPEG / TIFF / WEBP scan | image pipeline | fair |
+| Phone photo (JPG) | finds the sheet, removes perspective and shadows, uses EXIF rotation, then the image pipeline | fair, needs care |
+| DWG / HEIC | rejected with instructions (save as DXF / JPG) | — |
+
+For images the reader also: estimates the sheet size from line weights when the file has
+no dpi, squares the image up on the drawing's border frame, picks the drawing scale by
+voting across all dimensions (one OCR misread can't throw it off), and corrects X and Y
+stretch separately. When it can't read something that matters (a depth, a groove, a
+taper it isn't sure of), it **blocks** G-code instead of guessing.
+
+`python samples/check_inputs.py` runs every sample in every format against the DXF
+ground truth. Current result on 18 inputs (DXF-derived PDF, scan, photo, sideways photo,
+scanned PDF, low-res screenshot for 3 parts): **12 exact, 4 blocked for a human to fix,
+2 off by ≤ 0.015 mm** (tolerance text too small to read at 130 dpi).
+
 ## Results on the test drawings
 
 Three parts (stepped EN8 shaft with M20x1.5 thread and relief groove needing two setups;
@@ -133,7 +155,7 @@ different drawing scale, and a noisy 300 dpi scan:
 * Machine-type classifier: 100 % on a held-out synthetic set (split by part) and 9/9 on
   the independent sample drawings, with only 73–83 % confidence on the less typical
   ones — so it still flags them for a human.
-* `python -m pytest -q` → 30 tests (pipeline + web app).
+* `python -m pytest -q` → 45 tests (pipeline, image inputs, web app).
 
 Read these numbers for what they are: the samples were drawn cleanly, by a generator I
 wrote, following ISO line weights. **Real customer drawings will do worse**, especially
@@ -143,7 +165,8 @@ scans, and the honest measure is the correction log on your own drawings (below)
 
 ## Known limits (in order of how much they will hurt)
 
-1. **Scans of real-world drawings.** Coffee stains, faded prints, skew, hand-written
+1. **Scans and photos of real-world drawings.** Test photos here are simulated (perspective,
+   shadow, JPEG, EXIF rotation) from clean drawings. Coffee stains, faded prints, skew, hand-written
    corrections, rotated dimension text and stamps will break the scan reader far more
    often than the clean samples suggest. Expect to fix scans by hand; insist on DXF/PDF
    from customers where you can.

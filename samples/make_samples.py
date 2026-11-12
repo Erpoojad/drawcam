@@ -243,3 +243,66 @@ def main(outdir=HERE):
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else HERE)
+
+
+# ------------------------------------------------- realistic raster inputs
+def to_photo(pdf_path, out_path, seed=0, tilt=0.08, sideways=False):
+    """Phone photo of the printed sheet: on a table, perspective, shadow, warm light, JPEG."""
+    import cv2
+    from PIL import Image
+    rng = np.random.default_rng(seed)
+    page = pymupdf.open(pdf_path)[0]
+    pix = page.get_pixmap(dpi=220, colorspace=pymupdf.csRGB)
+    sheet = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, 3).astype(np.float32)
+    h, w = sheet.shape[:2]
+    H, W = int(h * 1.35), int(w * 1.3)
+    table = np.full((H, W, 3), (70, 85, 105), np.float32) + rng.normal(0, 6, (H, W, 3))
+    j = lambda s: rng.uniform(-s, s)
+    ox, oy = (W - w) / 2, (H - h) / 2
+    src = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+    dst = np.float32([[ox + j(tilt * w), oy + j(tilt * h)], [ox + w + j(tilt * w), oy + j(tilt * h)],
+                      [ox + w + j(tilt * w), oy + h + j(tilt * h)], [ox + j(tilt * w), oy + h + j(tilt * h)]])
+    M = cv2.getPerspectiveTransform(src, dst)
+    warped = cv2.warpPerspective(sheet, M, (W, H), flags=cv2.INTER_LINEAR)
+    mask = cv2.warpPerspective(np.ones((h, w), np.float32), M, (W, H))[..., None]
+    img = table * (1 - mask) + warped * mask
+    yy, xx = np.mgrid[0:H, 0:W]
+    shade = 1 - 0.38 * np.clip((xx / W) * 0.8 + (yy / H) * 0.6 - 0.35, 0, 1)        # shadow across one corner
+    img = img * shade[..., None] * np.array([1.0, 0.96, 0.88])                       # warm indoor light
+    img = cv2.GaussianBlur(img, (3, 3), 0.9) + rng.normal(0, 4, img.shape)
+    img = np.clip(img, 0, 255).astype(np.uint8)
+    im = Image.fromarray(img)
+    if sideways:                                    # stored rotated, EXIF says "rotate 90"
+        im = im.transpose(Image.Transpose.ROTATE_90)
+        ex = im.getexif()
+        ex[0x0112] = 6
+        im.save(out_path, "JPEG", quality=72, exif=ex)
+    else:
+        im.save(out_path, "JPEG", quality=72)
+
+
+def to_screenshot(pdf_path, out_path):
+    """Low-resolution screen grab of the drawing (no dpi metadata)."""
+    page = pymupdf.open(pdf_path)[0]
+    page.get_pixmap(dpi=130).save(out_path)
+
+
+def to_scanned_pdf(png_path, out_path):
+    """Scanner 'scan to PDF' with an invisible OCR text layer on top of the picture."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=842, height=595)
+    page.insert_image(page.rect, filename=png_path)
+    page.insert_text((60, 60), "MATERIAL SCALE DRAWN CHECKED", fontsize=9, render_mode=3)
+    doc.save(out_path)
+
+
+def make_raster_set(outdir):
+    out = os.path.join(outdir, "raster")
+    os.makedirs(out, exist_ok=True)
+    for i, name in enumerate(("shaft", "bush", "plate")):
+        pdf = os.path.join(outdir, name + ".pdf")
+        to_photo(pdf, os.path.join(out, f"{name}_photo.jpg"), seed=i)
+        to_photo(pdf, os.path.join(out, f"{name}_photo_sideways.jpeg"), seed=10 + i, sideways=True)
+        to_screenshot(pdf, os.path.join(out, f"{name}_screenshot.png"))
+        to_scanned_pdf(os.path.join(outdir, name + "_scan.png"), os.path.join(out, f"{name}_scanned.pdf"))
+    return out
