@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}drawcam{% endblock %}</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b4a7a'/><circle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='3'/><path d='M4 16h24' stroke='%23ffb703' stroke-width='2' stroke-dasharray='5 2 1 2'/></svg>">
+<style>
+:root{--bg:#f5f6f3;--panel:#fff;--ink:#1c2321;--muted:#5d6763;--line:#d9ddd8;--brand:#0b4a7a;--brand-ink:#fff;
+--warn-bg:#fff6db;--warn-ink:#6d4c00;--block-bg:#fde7e4;--block-ink:#8a1c10;--ok-bg:#e3f3e6;--ok-ink:#1d5a2b;--code:#11181c;--code-ink:#d9e4dc;
+--mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#131715;--panel:#1b211e;--ink:#e6ebe7;--muted:#9aa59f;--line:#2f3833;--brand:#5aa9e6;--brand-ink:#0c1a24;
+--warn-bg:#3a3014;--warn-ink:#f2d58a;--block-bg:#41201c;--block-ink:#f6b3a9;--ok-bg:#1d3423;--ok-ink:#a5dcb0;--code:#0c100e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--sans)}
+a{color:var(--brand)}
+header{border-bottom:1px solid var(--line);background:var(--panel)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+header .wrap{display:flex;align-items:center;gap:12px;height:56px}
+.logo{font-weight:700;font-size:19px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
+.logo span{color:var(--brand)}
+header small{color:var(--muted)}
+main{padding:28px 0 60px}
+h1{font-size:28px;line-height:1.2;margin:0 0 8px;letter-spacing:-.02em}
+h2{font-size:19px;margin:0 0 12px}
+p.lead{color:var(--muted);margin:0 0 24px;max-width:60ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:20px}
+.grid{display:grid;gap:20px;grid-template-columns:1fr}
+@media(min-width:820px){.grid.two{grid-template-columns:3fr 2fr}}
+label{display:block;font-weight:600;margin:0 0 6px}
+.hint{color:var(--muted);font-size:14px;margin:4px 0 0}
+input[type=file],select,input[type=number]{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1 1 160px}
+.field{margin-bottom:16px}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 15px var(--sans);padding:11px 18px;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer;text-decoration:none}
+.btn.ghost,button.ghost{background:transparent;color:var(--brand)}
+button:disabled{opacity:.6;cursor:wait}
+.samples{display:grid;gap:10px}
+.samples button{justify-content:flex-start;text-align:left;width:100%;background:transparent;color:var(--ink);border-color:var(--line);font-weight:500}
+.samples button b{color:var(--brand)}
+.notice{border-radius:8px;padding:12px 14px;margin:0 0 16px;font-size:15px}
+.notice.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.notice.block{background:var(--block-bg);color:var(--block-ink)}
+.notice.ok{background:var(--ok-bg);color:var(--ok-ink)}
+ul.review{list-style:none;padding:0;margin:0}
+ul.review li{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}
+ul.review li:first-child{border-top:0}
+.tag{flex:0 0 auto;font:700 11px/20px var(--sans);text-transform:uppercase;letter-spacing:.04em;padding:0 7px;border-radius:4px;height:20px}
+.tag.block{background:var(--block-bg);color:var(--block-ink)}.tag.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:15px;margin:0}
+.kv dt{color:var(--muted)}.kv dd{margin:0;font-variant-numeric:tabular-nums}
+textarea{width:100%;min-height:380px;font:13px/1.45 var(--mono);padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);resize:vertical}
+pre.code{background:var(--code);color:var(--code-ink);font:13px/1.5 var(--mono);padding:14px;border-radius:8px;max-height:460px;overflow:auto;margin:0}
+img.plot{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff;margin:0 0 14px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+details summary{cursor:pointer;font-weight:600;margin-bottom:10px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0}
+.steps li{counter-increment:s;position:relative;padding:0 0 12px 34px;color:var(--muted);font-size:15px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;background:var(--brand);color:var(--brand-ink);font:700 13px/24px var(--sans);text-align:center}
+.steps li b{color:var(--ink)}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding:18px 0}
+.spin{display:none}.busy .spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:r .8s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><a class="logo" href="/">draw<span>cam</span></a><small>drawing → CNC lathe / VMC program</small></div></header>
+<main><div class="wrap">{% block body %}{% endblock %}</div></main>
+<footer><div class="wrap">Generated programs are a starting point. Prove out every program on the machine: single block, rapid override low, dry run above the part. <a href="https://github.com/Erpoojad/drawcam">Source on GitHub</a></div></footer>
+<script>
+document.querySelectorAll("form[data-busy]").forEach(f=>f.addEventListener("submit",e=>{
+  const b=e.submitter||f.querySelector("button[type=submit]");
+  f.querySelectorAll("button").forEach(x=>x.disabled=true);
+  if(b){b.classList.add("busy");const t=b.querySelector(".t");if(t)t.textContent=f.dataset.busy;}
+}));
+</script>
+</body>
+</html>

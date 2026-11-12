@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ spec.part_name }} · drawcam{% endblock %}
+{% block body %}
+<p><a href="/">← New drawing</a></p>
+<h1>{{ spec.part_name }}</h1>
+<p class="lead">Read from <b>{{ meta.original or "drawing" }}</b>{% if meta.seconds %} in {{ meta.seconds }} s{% endif %} as a
+<b>{{ "turned part (lathe)" if spec.machine == "lathe" else "prismatic part (VMC)" }}</b>. Check the review list, correct the spec if needed, then generate.</p>
+{% if error %}<div class="notice block">{{ error }}</div>{% endif %}
+
+<div class="grid two">
+  <div class="panel">
+    <h2>Review list</h2>
+    {% if blocks %}<div class="notice block">{{ blocks|length }} item{{ "s" if blocks|length > 1 }} must be fixed before G-code can be generated.</div>
+    {% elif not spec.review %}<div class="notice ok">Nothing flagged. Still compare the spec with the drawing.</div>{% endif %}
+    <ul class="review">
+      {% for r in spec.review %}
+      <li><span class="tag {{ 'block' if r.severity == 'block' else 'warn' }}">{{ "block" if r.severity == "block" else "check" }}</span><span><b>{{ r.field }}:</b> {{ r.message }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="panel">
+    <h2>What was read</h2>
+    <dl class="kv">
+      <dt>Material</dt><dd>{{ spec.material }}</dd>
+      {% if spec.machine == "lathe" %}
+      <dt>Length</dt><dd>{{ spec.part_length }} mm</dd>
+      <dt>Max Ø</dt><dd>{{ spec.max_dia }} mm</dd>
+      <dt>Bar stock</dt><dd>Ø{{ spec.stock_dia }} × {{ spec.stock_length }} mm</dd>
+      <dt>Profile points</dt><dd>{{ spec.profile|length }}</dd>
+      <dt>Threads</dt><dd>{% for t in spec.threads %}M{{ "%g"|format(t.major_dia) }}×{{ "%g"|format(t.pitch) }} {% else %}none{% endfor %}</dd>
+      <dt>Grooves</dt><dd>{% for g in spec.grooves %}{{ g.width }} wide to Ø{{ g.bottom_dia }} {% else %}none{% endfor %}</dd>
+      <dt>Bore</dt><dd>{% if spec.bore %}Ø{{ spec.bore.dia }} {{ "through" if spec.bore.through else "× %s deep"|format(spec.bore.depth) }}{% else %}none{% endif %}</dd>
+      {% else %}
+      <dt>Part</dt><dd>{{ (spec.stock_x - 4)|round(2) }} × {{ (spec.stock_y - 4)|round(2) }} × {{ spec.part_z }} mm</dd>
+      <dt>Stock</dt><dd>{{ spec.stock_x }} × {{ spec.stock_y }} × {{ spec.stock_z }} mm</dd>
+      <dt>Holes</dt><dd>{{ spec.holes|length }}{% set kinds = spec.holes|map(attribute="kind")|list %}{% if kinds %} ({% for k in ["drill","tap","ream"] if k in kinds %}{{ kinds|select("equalto", k)|list|length }} {{ k }}{{ ", " if not loop.last }}{% endfor %}){% endif %}</dd>
+      <dt>Pockets</dt><dd>{% for p in spec.pockets %}{{ p.shape }} {% if p.shape == "rect" %}{{ p.w }}×{{ p.h }}{% elif p.shape == "circle" %}Ø{{ p.r * 2 }}{% endif %} DP{{ p.depth }}{{ ", " if not loop.last }}{% else %}none{% endfor %}</dd>
+      {% endif %}
+    </dl>
+  </div>
+</div>
+
+<div class="panel" id="spec">
+  <h2>Part spec</h2>
+  <p class="hint" style="margin:0 0 12px">Edit values to match the drawing. Once a BLOCK item is fixed, delete it from the <code>"review"</code> list (or change its severity to <code>"warn"</code>). Lathe: Z0 = finished right face, X values are diameters. VMC: X0 Y0 = part's bottom-left corner, Z0 = finished top.</p>
+  <form action="/job/{{ job_id }}/gcode" method="post" data-busy="Generating…">
+    <textarea name="spec" spellcheck="false" aria-label="Part spec JSON">{{ spec_json }}</textarea>
+    <div class="actions">
+      <button type="submit"><span class="spin"></span><span class="t">{{ "Regenerate G-code" if progs else "Generate G-code" }}</span></button>
+      <a class="btn ghost" href="/job/{{ job_id }}/file/spec.json">Download spec</a>
+    </div>
+  </form>
+</div>
+
+{% if progs %}
+<div id="programs">
+  <div class="panel">
+    <h2>Programs</h2>
+    <div class="actions" style="margin:0 0 16px"><a class="btn" href="/job/{{ job_id }}/zip">Download all (zip)</a></div>
+    {% if report %}<details><summary>Check report and cycle time</summary><pre class="code" style="white-space:pre-wrap">{{ report }}</pre></details>{% endif %}
+  </div>
+  {% for p in progs %}
+  <div class="panel">
+    <h2>{{ p.name }} <small style="color:var(--muted);font-weight:400">· {{ p.lines }} lines</small></h2>
+    {% if p.png %}<img class="plot" src="/job/{{ job_id }}/file/{{ p.png }}" alt="Toolpath backplot for {{ p.name }}">{% endif %}
+    <pre class="code">{{ p.code }}</pre>
+    <div class="actions"><a class="btn ghost" href="/job/{{ job_id }}/file/{{ p.name }}">Download {{ p.name }}</a></div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -80,6 +80,23 @@ for carbide turning/milling and HSS drills/taps, not proven numbers for your mac
 
 ---
 
+## Web app (Render)
+
+The same workflow runs in the browser: upload a drawing, read the review list, edit
+the part spec, generate, download the programs as a zip.
+
+```bash
+python -m drawcam.web.app          # local: http://localhost:8000
+```
+
+Deployed with the `Dockerfile` (it installs Tesseract OCR, which a plain Python
+runtime can't). `render.yaml` describes the service. On the free plan the server sleeps
+after 15 minutes idle (first request then takes ~1 minute) and uploaded jobs are
+deleted on restart or after 24 hours, so download your programs.
+
+Anyone with the link can use it. Don't upload drawings a customer considers
+confidential to a public link: run it locally for those.
+
 ## What it handles
 
 **Lathe (Fanuc 0i-T style)** — facing; stepped, tapered and chamfered OD profiles
@@ -116,7 +133,7 @@ different drawing scale, and a noisy 300 dpi scan:
 * Machine-type classifier: 100 % on a held-out synthetic set (split by part) and 9/9 on
   the independent sample drawings, with only 73–83 % confidence on the less typical
   ones — so it still flags them for a human.
-* `python -m pytest -q` → 25 tests.
+* `python -m pytest -q` → 30 tests (pipeline + web app).
 
 Read these numbers for what they are: the samples were drawn cleanly, by a generator I
 wrote, following ISO line weights. **Real customer drawings will do worse**, especially
@@ -166,7 +183,9 @@ drawcam/
   cam/         shop (machines, tools, cutting data, tap drills), turning, milling, gcode
   verify/      sim (G-code read-back, checks, backplot, cycle time)
   ml/          train_classifier, dataset (correction log), symbol_detector (next step)
+  web/         Flask app + templates (upload, review, generate)
   cli.py
+Dockerfile, render.yaml, requirements-deploy.txt   deployment
 samples/       make_samples.py + 9 test drawings
 examples/      full output for every sample (programs, backplots, reports)
 tests/         test_pipeline.py

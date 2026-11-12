@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: drawcam
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true

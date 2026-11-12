@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Turn an engineering drawing into a CNC program</h1>
+<p class="lead">Upload a DXF, a PDF exported from CAD, or a scan. drawcam reads the part, shows you what it understood and what needs checking, and writes Fanuc-style G-code for a turning centre or a VMC.</p>
+{% if error %}<div class="notice block">{{ error }}</div>{% endif %}
+<div class="grid two">
+  <div class="panel">
+    <h2>Your drawing</h2>
+    <form action="/read" method="post" enctype="multipart/form-data" data-busy="Reading drawing…">
+      <div class="field">
+        <label for="drawing">Drawing file</label>
+        <input id="drawing" name="drawing" type="file" accept=".dxf,.pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp" required>
+        <p class="hint">Best: DXF. Good: PDF exported from CAD. Works with care: scans at 300 dpi. DWG: save as DXF first.</p>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="machine">Machine</label>
+          <select id="machine" name="machine">
+            <option value="">Detect automatically</option>
+            <option value="lathe">CNC turning centre</option>
+            <option value="mill">VMC / milling</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dpi">Scan resolution (dpi)</label>
+          <input id="dpi" name="dpi" type="number" value="300" min="150" max="600" step="50">
+        </div>
+      </div>
+      <button type="submit"><span class="spin"></span><span class="t">Read drawing</span></button>
+      <p class="hint">Scans take up to a minute on the free server.</p>
+    </form>
+  </div>
+  <div>
+    <div class="panel">
+      <h2>No drawing handy? Try a sample</h2>
+      <form action="/read" method="post" class="samples" data-busy="Reading…">
+        {% for key, (fname, desc) in samples.items() %}
+        <button type="submit" name="sample" value="{{ key }}"><span class="spin"></span><span><b>{{ fname }}</b><br>{{ desc }}</span></button>
+        {% endfor %}
+      </form>
+    </div>
+    <div class="panel">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><b>Read.</b> Geometry, dimension text and title block become a part spec.</li>
+        <li><b>Review.</b> You fix anything flagged. Red items stop G-code until resolved.</li>
+        <li><b>Generate.</b> Programs, backplots, a crash check and cycle time.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+{% endblock %}

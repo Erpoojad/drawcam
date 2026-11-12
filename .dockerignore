@@ -1,0 +1,7 @@
+.git
+__pycache__
+.pytest_cache
+out
+jobs
+examples
+samples/*_scan.png
